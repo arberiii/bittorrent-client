@@ -1,7 +1,7 @@
 package bencode
 
 import (
-    "fmt"
+	"fmt"
 	"sort"
 	"strconv"
 	"unicode"
@@ -22,7 +22,6 @@ func EncodeBencode(data interface{}) string {
 		return ""
 	}
 }
-
 
 func encodeInt(val int) string {
 	return "i" + strconv.Itoa(val) + "e"
@@ -55,140 +54,133 @@ func encodeDictionary(val map[string]interface{}) string {
 	return "d" + result + "e"
 }
 
+// DecodeBencode decodes bencoded string to data
+func DecodeBencode(bencodedString string) (interface{}, error) {
+	val, _, err := decodeAllBencode(bencodedString, 0)
+	return val, err
+}
 
-// Example:
-// - 5:hello -> hello
-// - 10:hello12345 -> hello12345
-func decodeBencode(bencodedString string) (interface{}, error) {
-	if unicode.IsDigit(rune(bencodedString[0])) {
-		value, _, err := decodeStringBencode(bencodedString, 0)
-		return value, err
-	} else if rune(bencodedString[0]) == 'i' {
-	    value, _, err := decodeIntBencode(bencodedString, 1)
-	    return value, err
-	} else if rune(bencodedString[0]) == 'l' {
-	    value, _, err := decodeListBencode(bencodedString, 1)
-	    return value, err
-	} else if rune(bencodedString[0]) == 'd' {
-	    value, _, err := decodeDictBencode(bencodedString, 1)
-	    return value, err
-	} else {
-		return "", fmt.Errorf("Only strings are supported at the moment")
+func decodeAllBencode(bencodedString string, startIndex int) (interface{}, int, error) {
+	index := startIndex
+
+	for index < len(bencodedString) {
+		switch bencodedString[index] {
+		case 'e':
+			return nil, index + 1, nil
+		case 'i':
+			return decodeIntBencode(bencodedString, index+1)
+		case 'l':
+			return decodeListBencode(bencodedString, index+1)
+		case 'd':
+			return decodeDictBencode(bencodedString, index+1)
+		default:
+			return decodeStringBencode(bencodedString, index)
+		}
 	}
+
+	return nil, index, fmt.Errorf("unexpected end of input")
 }
 
 func decodeDictBencode(bencodedString string, startIndex int) (map[string]interface{}, int, error) {
-    index := startIndex
-    ret := make(map[string]interface{})
-    var key = ""
-    for bencodedString[index] != 'e' {
-        if unicode.IsDigit(rune(bencodedString[index])) {
-            val, newIndex, err := decodeStringBencode(bencodedString, index)
-            if err != nil {
-                return ret, 0, err
-            }
-            index = newIndex
-            if (key == "") {
-                key = val
-            } else {
-                ret[key] = val
-                key = ""
-            }
+	index := startIndex
+	ret := make(map[string]interface{})
+	var key = ""
+	for bencodedString[index] != 'e' {
+		if unicode.IsDigit(rune(bencodedString[index])) {
+			val, newIndex, err := decodeStringBencode(bencodedString, index)
+			if err != nil {
+				return ret, 0, err
+			}
+			index = newIndex
+			if key == "" {
+				key = val
+			} else {
+				ret[key] = val
+				key = ""
+			}
 
-        } else if rune(bencodedString[index]) == 'i' {
-            val, newIndex, err := decodeIntBencode(bencodedString, index+1)
-            if err != nil {
-                return ret, 0, err
-            }
-            index = newIndex
-            ret[key] = val
-            key = ""
-        } else if rune(bencodedString[index]) == 'l' {
-            val, newIndex, err := decodeListBencode(bencodedString, index+1)
-            if err != nil {
-                return ret, 0, err
-            }
-            index = newIndex
-            ret[key] = val
-            key = ""
-        } else if rune(bencodedString[index]) == 'd' {
-            val, newIndex, err := decodeDictBencode(bencodedString, index+1)
-            if err != nil {
-                return ret, 0, err
-            }
-            index = newIndex
-            ret[key] = val
-            key = ""
-        }
-    }
-    return ret, index + 1, nil
-}
-
-func decodeListBencode(bencodedString string, startIndex int) ([]interface{}, int, error) {
-    index := startIndex
-    var ret []interface{}
-    for bencodedString[index] != 'e' {
-        if unicode.IsDigit(rune(bencodedString[index])) {
-            val, newIndex, err := decodeStringBencode(bencodedString, index)
-            if err != nil {
-                return ret, 0, err
-            }
-            index = newIndex
-            ret = append(ret, val)
-        } else if rune(bencodedString[index]) == 'i' {
-            val, newIndex, err := decodeIntBencode(bencodedString, index+1)
-            if err != nil {
-                return ret, 0, err
-            }
-            index = newIndex
-            ret = append(ret, val)
-        }
-    }
-    return ret, index + 1, nil
+		} else if rune(bencodedString[index]) == 'i' {
+			val, newIndex, err := decodeIntBencode(bencodedString, index+1)
+			if err != nil {
+				return ret, 0, err
+			}
+			index = newIndex
+			ret[key] = val
+			key = ""
+		} else if rune(bencodedString[index]) == 'l' {
+			val, newIndex, err := decodeAllBencode(bencodedString, index)
+			if err != nil {
+				return ret, 0, err
+			}
+			index = newIndex
+			ret[key] = val
+			key = ""
+		} else if rune(bencodedString[index]) == 'd' {
+			val, newIndex, err := decodeDictBencode(bencodedString, index+1)
+			if err != nil {
+				return ret, 0, err
+			}
+			index = newIndex
+			ret[key] = val
+			key = ""
+		}
+	}
+	return ret, index + 1, nil
 }
 
 func decodeIntBencode(bencodedString string, startIndex int) (int, int, error) {
-    index := startIndex
-    isNegative := rune(bencodedString[startIndex]) == '-'
-    if (isNegative) {
-        index += 1
-    }
-    var lastIndex int
+	endIndex := startIndex
 
-    for i := index; i < len(bencodedString); i++ {
-        if bencodedString[i] == 'e' {
-            lastIndex = i
-            break
-        }
-    }
+	for endIndex < len(bencodedString) && bencodedString[endIndex] != 'e' {
+		endIndex++
+	}
 
-    numberStr := bencodedString[index:lastIndex]
+	numberStr := bencodedString[startIndex:endIndex]
 
-    number, err := strconv.Atoi(numberStr)
-    if err != nil {
-        return 0, 0, err
-    }
-    if (isNegative) {
-        return number * -1, lastIndex+1, nil
-    }
-    return number, lastIndex + 1, nil
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return number, endIndex + 1, nil
 }
 
 func decodeStringBencode(bencodedString string, startIndex int) (string, int, error) {
-    var firstColonIndex int
+	colonIndex := startIndex
 
-    for i := startIndex; i < len(bencodedString); i++ {
-        if bencodedString[i] == ':' {
-            firstColonIndex = i
-            break
-        }
-    }
-    lengthStr := bencodedString[startIndex:firstColonIndex]
+	for colonIndex < len(bencodedString) && bencodedString[colonIndex] != ':' {
+		colonIndex++
+	}
 
-    length, err := strconv.Atoi(lengthStr)
-    if err != nil {
-        return "", 0, err
-    }
+	lengthStr := bencodedString[startIndex:colonIndex]
 
-    return bencodedString[firstColonIndex+1 : firstColonIndex+1+length], firstColonIndex+1+length, nil
+	length, err := strconv.Atoi(lengthStr)
+	if err != nil {
+		return "", 0, err
+	}
+
+	dataStart := colonIndex + 1
+	dataEnd := dataStart + length
+
+	if dataEnd > len(bencodedString) {
+		return "", 0, fmt.Errorf("string length exceeds available data")
+	}
+
+	return bencodedString[dataStart:dataEnd], dataEnd, nil
+}
+
+func decodeListBencode(bencodedString string, startIndex int) ([]interface{}, int, error) {
+	index := startIndex
+	var retList []interface{}
+
+	for bencodedString[index] != 'e' {
+		val, newIndex, err := decodeAllBencode(bencodedString, index)
+		if err != nil {
+			return nil, 0, err
+		}
+		index = newIndex
+		retList = append(retList, val)
+	}
+
+	return retList, index + 1, nil
 }

@@ -5,7 +5,7 @@ import (
 )
 
 func TestGetTorrentInfoFromFile(t *testing.T) {
-	t.Run("Integer", func(t *testing.T) {
+	t.Run("Simple torrent", func(t *testing.T) {
 		result, err := GetTorrentInfoFromFile("sample.torrent")
 		if err != nil {
 			t.Errorf("Error: %s", err)

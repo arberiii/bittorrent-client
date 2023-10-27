@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
+	"github.com/arberiii/bittorrent-client/peers"
 	"github.com/arberiii/bittorrent-client/torrent"
+	"net/http"
 )
 
 func main() {
 	fmt.Println("Hello, world!")
-	//val, err := bencode.DecodeBencode("i42e")
-
+	client := &http.Client{}
 	torrent, err := torrent.GetTorrentInfoFromFile("torrent/sample.torrent")
-	fmt.Println(torrent, err)
+	peers, err := peers.GetTrackingPeers(torrent, client)
+	fmt.Println(peers, err)
 }
